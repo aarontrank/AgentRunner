@@ -26,7 +26,9 @@ function migrate() {
       environment_variables TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      cli_preset TEXT,
+      cli_options TEXT
     );
     CREATE TABLE IF NOT EXISTS runs (
       run_id TEXT PRIMARY KEY,
@@ -61,18 +63,23 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_artifacts_run_id ON artifacts(run_id);
     CREATE INDEX IF NOT EXISTS idx_prompt_versions_agent ON prompt_versions(agent_id, version);
   `);
+
+  // Non-destructive migrations for existing databases
+  const agentCols = (db.prepare('PRAGMA table_info(agents)').all() as any[]).map(c => c.name);
+  if (!agentCols.includes('cli_preset')) db.exec('ALTER TABLE agents ADD COLUMN cli_preset TEXT');
+  if (!agentCols.includes('cli_options')) db.exec('ALTER TABLE agents ADD COLUMN cli_options TEXT');
 }
 
 // --- Agent DB ops ---
 export function dbAgentsAll() { return db.prepare('SELECT * FROM agents ORDER BY name').all(); }
 export function dbAgentGet(id: string) { return db.prepare('SELECT * FROM agents WHERE id = ?').get(id); }
 export function dbAgentInsert(a: any) {
-  db.prepare(`INSERT INTO agents (id,name,execution_command,working_directory,cron_expression,timeout_minutes,environment_variables,enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-    .run(a.id, a.name, a.execution_command, a.working_directory, a.cron_expression, a.timeout_minutes, a.environment_variables, a.enabled ? 1 : 0, a.created_at, a.updated_at);
+  db.prepare(`INSERT INTO agents (id,name,execution_command,working_directory,cron_expression,timeout_minutes,environment_variables,enabled,created_at,updated_at,cli_preset,cli_options) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(a.id, a.name, a.execution_command, a.working_directory, a.cron_expression, a.timeout_minutes, a.environment_variables, a.enabled ? 1 : 0, a.created_at, a.updated_at, a.cli_preset ?? null, a.cli_options ?? null);
 }
 export function dbAgentUpdate(a: any) {
-  db.prepare(`UPDATE agents SET name=?,execution_command=?,working_directory=?,cron_expression=?,timeout_minutes=?,environment_variables=?,enabled=?,updated_at=? WHERE id=?`)
-    .run(a.name, a.execution_command, a.working_directory, a.cron_expression, a.timeout_minutes, a.environment_variables, a.enabled ? 1 : 0, a.updated_at, a.id);
+  db.prepare(`UPDATE agents SET name=?,execution_command=?,working_directory=?,cron_expression=?,timeout_minutes=?,environment_variables=?,enabled=?,updated_at=?,cli_preset=?,cli_options=? WHERE id=?`)
+    .run(a.name, a.execution_command, a.working_directory, a.cron_expression, a.timeout_minutes, a.environment_variables, a.enabled ? 1 : 0, a.updated_at, a.cli_preset ?? null, a.cli_options ?? null, a.id);
 }
 export function dbAgentDelete(id: string) { db.prepare('DELETE FROM agents WHERE id = ?').run(id); }
 

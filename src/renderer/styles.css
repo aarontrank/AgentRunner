@@ -83,6 +83,7 @@ input, select, textarea { -webkit-app-region: no-drag; }
 .run-item.active { background: var(--bg); }
 .run-item .run-id { font-family: monospace; font-size: 11px; color: var(--text-muted); }
 .run-item .run-time { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+.run-detail-inline { padding: 12px; background: var(--bg); border-radius: 0 0 4px 4px; margin-bottom: 4px; }
 
 /* Terminal output */
 .terminal { background: #0d0d1a; border-radius: 4px; padding: 10px 12px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; line-height: 1.5; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
@@ -165,6 +166,54 @@ input, select, textarea { -webkit-app-region: no-drag; }
 .markdown-body table { border-collapse: collapse; margin: 0.8em 0; width: 100%; }
 .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
 .markdown-body th { background: var(--surface2); }
+
+/* CLI Preset selector */
+.preset-selector { display: flex; gap: 0; margin-top: 4px; }
+.preset-btn { padding: 6px 14px; font-size: 12px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+.preset-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.preset-btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.preset-btn:not(:first-child) { border-left: none; }
+.preset-btn:hover { background: var(--surface2); color: var(--text); }
+.preset-btn.active { background: var(--accent-dim); color: var(--text); border-color: var(--accent-dim); }
+
+/* Claude options panel */
+.claude-options { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+.claude-options-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 12px; }
+.form-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* Command preview */
+.cmd-preview { margin-top: 10px; padding: 10px 12px; background: #0d0d1a; border-radius: 4px; }
+.cmd-preview-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; }
+.cmd-preview-code { font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; color: var(--cyan); white-space: pre-wrap; word-break: break-all; display: block; }
+
+/* CLAUDE.md inline editor */
+.claudemd-editor { margin-top: 6px; }
+.claudemd-editor textarea { width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; line-height: 1.5; resize: vertical; color: var(--text); }
+.claudemd-editor textarea:focus { outline: none; border-color: var(--accent); }
+.claudemd-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* Stream-JSON result view */
+.stream-json-view { display: flex; flex-direction: column; gap: 10px; }
+.stream-section { }
+.stream-section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 6px; }
+.stream-result { background: var(--bg); border-radius: 4px; max-height: 400px; overflow-y: auto; }
+
+/* Tool call blocks */
+.tool-call { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+.tool-call.tool-call-error { border-color: var(--red); }
+.tool-call-header { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; user-select: none; transition: background 0.1s; }
+.tool-call-header:hover { background: var(--surface2); }
+.tool-call-icon { font-size: 11px; color: var(--green); }
+.tool-call.tool-call-error .tool-call-icon { color: var(--red); }
+.tool-call-name { font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; font-weight: 600; flex: 1; }
+.tool-call-chevron { font-size: 10px; color: var(--text-muted); }
+.tool-call-body { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.tool-call-section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; }
+.tool-call-code { font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5; background: #0d0d1a; border-radius: 3px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; margin: 0; }
+
+/* Token usage footer */
+.stream-usage { display: flex; gap: 14px; padding: 8px 12px; background: var(--bg); border-radius: 4px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border); }
+.stream-usage span::before { content: ''; }
 
 /* Spinner */
 .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }

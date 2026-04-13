@@ -29,6 +29,8 @@ function toDbAgent(a: Agent) {
     timeout_minutes: a.timeoutMinutes,
     environment_variables: a.environmentVariables ? JSON.stringify(a.environmentVariables) : null,
     enabled: a.enabled, created_at: a.createdAt, updated_at: a.updatedAt,
+    cli_preset: a.cliPreset ?? null,
+    cli_options: a.claudeOptions ? JSON.stringify(a.claudeOptions) : null,
   };
 }
 
@@ -74,6 +76,8 @@ export function registerIpcHandlers() {
       enabled: data.enabled !== false,
       createdAt: now,
       updatedAt: now,
+      cliPreset: data.cliPreset,
+      claudeOptions: data.claudeOptions,
     };
     // Ensure unique id
     const existing = getAgentsFromFile();
@@ -208,5 +212,21 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC.LOG_GET, (_, agentId: string, runId: string, type: 'stdout' | 'stderr') => {
     const logPath = path.join(getRunDir(agentId, runId), `${type}.log`);
     return fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf-8') : null;
+  });
+
+  // --- CLAUDE.md (in agent's workingDirectory) ---
+  ipcMain.handle(IPC.CLAUDE_MD_GET, (_, agentId: string) => {
+    const agent = getAgentsFromFile().find(a => a.id === agentId);
+    if (!agent) return null;
+    const p = path.join(agent.workingDirectory, 'CLAUDE.md');
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : '';
+  });
+
+  ipcMain.handle(IPC.CLAUDE_MD_SAVE, (_, agentId: string, content: string) => {
+    const agent = getAgentsFromFile().find(a => a.id === agentId);
+    if (!agent) return false;
+    if (!fs.existsSync(agent.workingDirectory)) return false;
+    fs.writeFileSync(path.join(agent.workingDirectory, 'CLAUDE.md'), content);
+    return true;
   });
 }

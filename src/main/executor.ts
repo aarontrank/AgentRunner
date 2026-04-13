@@ -4,7 +4,7 @@ import * as os from 'os';
 import { spawn, ChildProcess } from 'child_process';
 import { BrowserWindow } from 'electron';
 import { v4 as uuid } from 'uuid';
-import { Agent, IPC, RunStatus } from '../shared/types';
+import { Agent, ClaudeOptions, IPC, RunStatus } from '../shared/types';
 import {
   getPromptPath, getRunDir, getArtifactsDir, getConfig,
   getPromptHistoryDir,
@@ -44,6 +44,36 @@ export function isAgentRunning(agentId: string): boolean {
     if ((proc as any).__agentId === agentId && !proc.killed) return true;
   }
   return false;
+}
+
+// Build the final shell command string from an agent's preset + options
+export function buildCommand(agent: Agent): string {
+  const preset = agent.cliPreset || 'custom';
+
+  if (preset === 'claude') {
+    const opts: ClaudeOptions = agent.claudeOptions || {};
+    const parts: string[] = [agent.executionCommand || 'claude'];
+
+    if (opts.model) parts.push('--model', opts.model);
+    if (opts.maxTurns) parts.push('--max-turns', String(opts.maxTurns));
+    if (opts.outputFormat) {
+      parts.push('--output-format', opts.outputFormat);
+      if (opts.outputFormat === 'stream-json') parts.push('--verbose');
+    }
+    if (opts.sessionMode === 'continue') parts.push('--continue');
+
+    const perm = opts.permissionMode ?? 'bypass';
+    if (perm === 'bypass') {
+      parts.push('--dangerously-skip-permissions');
+    } else if (perm === 'allowedTools' && opts.allowedTools) {
+      parts.push('--allowedTools', opts.allowedTools);
+    }
+
+    return parts.join(' ');
+  }
+
+  // kiro, codex, custom: use executionCommand as-is
+  return agent.executionCommand;
 }
 
 const IGNORE_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.cache', '.next', '__pycache__', '.venv']);
@@ -155,8 +185,8 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   const stdoutLog = fs.createWriteStream(path.join(runDir, 'stdout.log'));
   const stderrLog = fs.createWriteStream(path.join(runDir, 'stderr.log'));
 
-  const parts = agent.executionCommand.split(/\s+/);
-  const proc = spawn(parts[0], parts.slice(1), {
+  const command = buildCommand(agent);
+  const proc = spawn(command, [], {
     cwd: agent.workingDirectory,
     env,
     stdio: ['pipe', 'pipe', 'pipe'],

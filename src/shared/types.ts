@@ -1,3 +1,16 @@
+// CLI preset — controls which structured options panel appears in the form
+export type CliPreset = 'custom' | 'claude' | 'kiro' | 'codex';
+
+// Claude Code-specific options (map to CLI flags at spawn time)
+export interface ClaudeOptions {
+  model?: string;                                          // --model
+  maxTurns?: number;                                       // --max-turns
+  outputFormat?: 'text' | 'stream-json';                  // --output-format
+  sessionMode?: 'fresh' | 'continue';                     // --continue
+  permissionMode?: 'bypass' | 'allowedTools' | 'default'; // --dangerously-skip-permissions | --allowedTools | (none)
+  allowedTools?: string;                                   // comma-separated, e.g. "Bash,Read,Write"
+}
+
 // Agent definition matching agents.json schema
 export interface Agent {
   id: string;
@@ -10,6 +23,8 @@ export interface Agent {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  cliPreset?: CliPreset;
+  claudeOptions?: ClaudeOptions;
 }
 
 // Run states
@@ -95,4 +110,8 @@ export const IPC = {
 
   // Logs
   LOG_GET: 'log:get',
+
+  // CLAUDE.md (read/write file in agent's workingDirectory)
+  CLAUDE_MD_GET: 'claudemd:get',
+  CLAUDE_MD_SAVE: 'claudemd:save',
 } as const;

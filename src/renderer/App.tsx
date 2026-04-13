@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Agent, Run, RunStatus, AppConfig, IPC, Artifact, PromptVersion } from '../shared/types';
+import { Agent, Run, AppConfig, IPC } from '../shared/types';
 import AgentForm from './AgentForm';
 import SettingsPanel from './SettingsPanel';
 import PromptEditor from './PromptEditor';
@@ -42,6 +42,9 @@ export default function App() {
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [outputBuffers, setOutputBuffers] = useState<Record<string, { stdout: string; stderr: string }>>({});
+  const [claudeMd, setClaudeMd] = useState<string | null>(null);
+  const [editingClaudeMd, setEditingClaudeMd] = useState(false);
+  const [claudeMdDraft, setClaudeMdDraft] = useState('');
 
   const loadAgents = useCallback(async () => {
     const list = await api.invoke(IPC.AGENTS_LIST);
@@ -65,12 +68,20 @@ export default function App() {
     return unsub;
   }, [loadAgents]);
 
+  const loadClaudeMd = useCallback(async (agentId: string) => {
+    const content = await api.invoke(IPC.CLAUDE_MD_GET, agentId);
+    setClaudeMd(content ?? null);
+  }, []);
+
   useEffect(() => {
     if (selectedId) {
       loadRuns(selectedId);
       loadPrompt(selectedId);
+      const agent = agents.find(a => a.id === selectedId);
+      if (agent?.cliPreset === 'claude') loadClaudeMd(selectedId);
+      else setClaudeMd(null);
     }
-  }, [selectedId, loadRuns, loadPrompt]);
+  }, [selectedId, loadRuns, loadPrompt, loadClaudeMd, agents]);
 
   // Listen for run status changes
   useEffect(() => {
@@ -153,6 +164,13 @@ export default function App() {
     setShowPromptEditor(false);
   };
 
+  const handleSaveClaudeMd = async () => {
+    if (!selectedId) return;
+    await api.invoke(IPC.CLAUDE_MD_SAVE, selectedId, claudeMdDraft);
+    setClaudeMd(claudeMdDraft);
+    setEditingClaudeMd(false);
+  };
+
   const handleDeleteRun = async (runId: string) => {
     if (!selectedId || !confirm('Delete this run permanently?')) return;
     await api.invoke(IPC.RUN_DELETE, selectedId, runId);
@@ -226,6 +244,39 @@ export default function App() {
                 </div>
               </div>
 
+              {/* CLAUDE.md — only for claude preset agents */}
+              {selected.cliPreset === 'claude' && (
+                <div className="section">
+                  <div className="section-header">
+                    <span className="section-title">CLAUDE.md</span>
+                    <button className="btn btn-sm" onClick={() => {
+                      setClaudeMdDraft(claudeMd || '');
+                      setEditingClaudeMd(true);
+                    }}>Edit</button>
+                  </div>
+                  {editingClaudeMd ? (
+                    <div className="claudemd-editor">
+                      <textarea
+                        value={claudeMdDraft}
+                        onChange={e => setClaudeMdDraft(e.target.value)}
+                        placeholder="# Project context for Claude&#10;&#10;Add standing instructions, project overview, tool behaviour rules..."
+                        rows={8}
+                      />
+                      <div className="claudemd-actions">
+                        <button className="btn btn-sm" onClick={() => setEditingClaudeMd(false)}>Cancel</button>
+                        <button className="btn btn-sm btn-primary" onClick={handleSaveClaudeMd}>Save</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="prompt-preview">
+                      {claudeMd
+                        ? claudeMd.split('\n').slice(0, 8).join('\n') + (claudeMd.split('\n').length > 8 ? '\n...' : '')
+                        : <span style={{ color: 'var(--text-muted)' }}>(no CLAUDE.md in working directory)</span>}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Current / Latest Run */}
               {activeRun && (
                 <div className="section">
@@ -239,8 +290,10 @@ export default function App() {
                     </div>
                   </div>
                   <RunDetail
+                    key={activeRun.runId}
                     run={activeRun}
                     agentId={selected.id}
+                    agent={selected}
                     output={outputBuffers[activeRun.runId]}
                     onDelete={() => handleDeleteRun(activeRun.runId)}
                   />
@@ -255,27 +308,29 @@ export default function App() {
                 <div className="run-list">
                   {runs.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>No runs yet</div>}
                   {runs.filter(r => !activeRun || r.runId !== activeRun.runId).map(r => (
-                    <div
-                      key={r.runId}
-                      className={`run-item ${selectedRunId === r.runId ? 'active' : ''}`}
-                      onClick={() => setSelectedRunId(selectedRunId === r.runId ? null : r.runId)}
-                    >
-                      <span className={badgeClass(r.status)}>{r.status}</span>
-                      <span className="run-id">{r.runId.slice(0, 20)}</span>
-                      <span className="run-time">{r.startedAt ? new Date(r.startedAt).toLocaleString() : ''}</span>
-                    </div>
+                    <React.Fragment key={r.runId}>
+                      <div
+                        className={`run-item ${selectedRunId === r.runId ? 'active' : ''}`}
+                        onClick={() => setSelectedRunId(selectedRunId === r.runId ? null : r.runId)}
+                      >
+                        <span className={badgeClass(r.status)}>{r.status}</span>
+                        <span className="run-id">{r.runId.slice(0, 20)}</span>
+                        <span className="run-time">{r.startedAt ? new Date(r.startedAt).toLocaleString() : ''}</span>
+                      </div>
+                      {selectedRunId === r.runId && (
+                        <div className="run-detail-inline">
+                          <RunDetail
+                            run={r}
+                            agentId={selected.id}
+                            agent={selected}
+                            output={outputBuffers[r.runId]}
+                            onDelete={() => handleDeleteRun(r.runId)}
+                          />
+                        </div>
+                      )}
+                    </React.Fragment>
                   ))}
                 </div>
-                {selectedRunId && runs.find(r => r.runId === selectedRunId) && (
-                  <div style={{ marginTop: 12 }}>
-                    <RunDetail
-                      run={runs.find(r => r.runId === selectedRunId)!}
-                      agentId={selected.id}
-                      output={outputBuffers[selectedRunId]}
-                      onDelete={() => handleDeleteRun(selectedRunId)}
-                    />
-                  </div>
-                )}
               </div>
             </>
           )}
