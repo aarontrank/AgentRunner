@@ -22,24 +22,134 @@ The UI has a sidebar listing agents (with status indicators), a detail panel sho
 
 ## Requirements
 
-- macOS (Apple Silicon or Intel)
+- macOS 13 (Ventura) or later — Apple Silicon or Intel
 - Node.js 20+
-- npm 9+
+- npm 9+ (included with Node.js)
+- Xcode Command Line Tools (for compiling native dependencies)
 
-## Getting Started
+## Installation
+
+These steps walk you through building AgentRunner from source and installing it as a regular macOS app. Everything is done in **Terminal** (find it in Applications → Utilities → Terminal).
+
+### 1. Install Xcode Command Line Tools
+
+AgentRunner depends on native modules (`better-sqlite3`, `node-pty`) that must be compiled on your machine. This requires Apple's build tools.
+
+Run this in Terminal:
 
 ```bash
-# Install dependencies
+xcode-select --install
+```
+
+A dialog will appear — click **Install** and wait for it to finish. If you see "already installed", you're good to go.
+
+### 2. Install Node.js
+
+If you don't have Node.js installed, the easiest way is to download the installer from the official website:
+
+1. Go to [https://nodejs.org](https://nodejs.org)
+2. Download the **LTS** version (20 or later)
+3. Open the downloaded `.pkg` file and follow the prompts
+
+To verify it worked, run:
+
+```bash
+node --version   # should print v20.x.x or higher
+npm --version    # should print 9.x.x or higher
+```
+
+> **Alternative (Homebrew):** If you use Homebrew, you can run `brew install node@20` instead.
+
+### 3. Download AgentRunner
+
+Clone the repository (or download and unzip it):
+
+```bash
+git clone <repository-url>
+cd agentrunner
+```
+
+If you downloaded a ZIP file, unzip it and open Terminal in that folder:
+
+```bash
+cd ~/Downloads/agentrunner   # adjust to wherever you unzipped it
+```
+
+### 4. Install dependencies
+
+```bash
 npm install
+```
 
-# Development (two terminals)
-npm run dev       # Terminal 1: starts tsc watch + Vite dev server
-npm run start     # Terminal 2: launches Electron (after Vite shows "ready")
+This downloads all required packages and compiles the native modules for Electron. It may take a few minutes the first time. You'll see a lot of output — warnings are normal, errors are not.
 
-# Or, single command build + run
+> **Troubleshooting:** If you see errors about `node-gyp`, `better-sqlite3`, or `node-pty` failing to build, make sure Xcode Command Line Tools are installed (step 1). You can also try `sudo xcode-select --reset` and then run `npm install` again.
+
+### 5. Build and package the app
+
+```bash
+npm run dist
+```
+
+This compiles the TypeScript source, bundles the UI, and packages everything into a macOS `.dmg` installer. It takes 1–3 minutes.
+
+When it finishes, you'll find the output in the `release/` folder:
+
+```
+release/
+├── AgentRunner-1.0.0.dmg        # Disk image installer
+├── AgentRunner-1.0.0-mac.zip    # Zipped .app bundle
+└── mac/
+    └── AgentRunner.app           # The app itself
+```
+
+### 6. Install the app
+
+**Option A — Use the DMG (recommended):**
+
+1. Open `release/AgentRunner-1.0.0.dmg`
+2. Drag **AgentRunner** into your **Applications** folder
+3. Eject the disk image
+
+**Option B — Direct copy:**
+
+```bash
+cp -r release/mac/AgentRunner.app /Applications/
+```
+
+### 7. First launch
+
+When you first open AgentRunner, macOS may show a warning because the app isn't signed with an Apple Developer certificate:
+
+1. Open **System Settings → Privacy & Security**
+2. Scroll down — you'll see a message about AgentRunner being blocked
+3. Click **Open Anyway**
+
+You only need to do this once. After that, the app opens normally.
+
+> **Tip:** AgentRunner runs in the menu bar. If you close the window, look for the icon in your menu bar (top-right of the screen) to reopen it.
+
+## Development
+
+For working on AgentRunner's code, use the development workflow instead of building a `.dmg` each time:
+
+```bash
+# Terminal 1: start the TypeScript compiler and Vite dev server
+npm run dev
+
+# Terminal 2: launch Electron (wait until Terminal 1 shows "ready")
+npm run start
+```
+
+Or as a single build-and-run:
+
+```bash
 npm run build && npm run start
+```
 
-# Package as a distributable .app / .dmg
+To rebuild the distributable `.dmg` after making changes:
+
+```bash
 npm run dist
 ```
 
