@@ -2,7 +2,7 @@ import * as cron from 'node-cron';
 import { BrowserWindow } from 'electron';
 import { Agent } from '../shared/types';
 import { getAgentsFromFile } from './config';
-import { executeRun } from './executor';
+import { executeRun, isAgentRunning } from './executor';
 
 const scheduledTasks = new Map<string, cron.ScheduledTask>();
 
@@ -18,6 +18,7 @@ export function scheduleAgent(agent: Agent) {
   if (!agent.enabled || !cron.validate(agent.schedule.cron)) return;
 
   const task = cron.schedule(agent.schedule.cron, () => {
+    if (isAgentRunning(agent.id)) return;
     const win = BrowserWindow.getAllWindows()[0] || null;
     executeRun(agent, win);
   });

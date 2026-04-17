@@ -37,7 +37,15 @@ export function initShellPath(): Promise<void> {
 // Track active processes: runId -> ChildProcess
 const activeProcesses = new Map<string, ChildProcess>();
 
+// Guard: prevent finishRun from executing twice for the same run (e.g. timeout + close)
+const finishedRuns = new Set<string>();
+
+// Track runs that were explicitly cancelled so close handler uses 'Cancelled' status
+const cancelledRuns = new Set<string>();
+
 export function getActiveProcesses() { return activeProcesses; }
+export function getFinishedRuns() { return finishedRuns; }
+export function getCancelledRuns() { return cancelledRuns; }
 
 export function isAgentRunning(agentId: string): boolean {
   for (const [, proc] of activeProcesses) {
@@ -218,20 +226,20 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
     if (!proc.killed) {
       proc.kill('SIGTERM');
       setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 5000);
-      finishRun(runId, agent, 'Timed Out', null, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot);
+      finishRun(runId, agent, 'Timed Out', null, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot, startedAt);
     }
   }, timeoutMs);
 
   proc.on('close', (code) => {
     clearTimeout(timer);
-    const status: RunStatus = code === 0 ? 'Completed' : 'Failed';
-    finishRun(runId, agent, status, code, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot);
+    const status: RunStatus = cancelledRuns.has(runId) ? 'Cancelled' : (code === 0 ? 'Completed' : 'Failed');
+    finishRun(runId, agent, status, code, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot, startedAt);
   });
 
   proc.on('error', (err) => {
     clearTimeout(timer);
     stderrLog.write(err.message);
-    finishRun(runId, agent, 'Failed', 1, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot);
+    finishRun(runId, agent, 'Failed', 1, win, runDir, snapshotPath, stdoutLog, stderrLog, preRunSnapshot, startedAt);
   });
 
   return runId;
@@ -241,9 +249,14 @@ function finishRun(
   runId: string, agent: Agent, status: RunStatus, exitCode: number | null,
   win: BrowserWindow | null, runDir: string, snapshotPath: string,
   stdoutLog: fs.WriteStream, stderrLog: fs.WriteStream,
-  preRunSnapshot: Map<string, number>,
+  preRunSnapshot: Map<string, number>, startedAt: string,
 ) {
+  // Guard: only run once per runId (timeout + close can both fire)
+  if (finishedRuns.has(runId)) return;
+  finishedRuns.add(runId);
+
   activeProcesses.delete(runId);
+  cancelledRuns.delete(runId);
   stdoutLog.end();
   stderrLog.end();
 
@@ -260,7 +273,7 @@ function finishRun(
   }
 
   // Write meta.json
-  const meta = { runId, agentId: agent.id, status, startedAt: null, completedAt, exitCode };
+  const meta = { runId, agentId: agent.id, status, startedAt, completedAt, exitCode };
   fs.writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify(meta, null, 2));
 
   // Clean up snapshot
@@ -300,6 +313,7 @@ function notify(agent: Agent, status: string, detail: string) {
 export function cancelRun(runId: string) {
   const proc = activeProcesses.get(runId);
   if (!proc || proc.killed) return false;
+  cancelledRuns.add(runId);
   proc.kill('SIGTERM');
   setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 5000);
   return true;
