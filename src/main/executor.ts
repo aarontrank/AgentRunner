@@ -150,6 +150,7 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   if (!promptContent.trim()) {
     dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: null, prompt_content: '', timeout_minutes: agent.timeoutMinutes, kiro_agent: agent.kiroAgent ?? null });
     notify(agent, 'Failed', 'Prompt file is missing or empty');
+    try { require('./socket-server').broadcastRunDone(runId, 'Failed', agent.id); } catch {}
     return runId;
   }
 
@@ -170,6 +171,7 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   if (!fs.existsSync(agent.workingDirectory)) {
     dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: promptVersion, prompt_content: promptContent, timeout_minutes: agent.timeoutMinutes, kiro_agent: agent.kiroAgent ?? null });
     notify(agent, 'Failed', `Working directory does not exist: ${agent.workingDirectory}`);
+    try { require('./socket-server').broadcastRunDone(runId, 'Failed', agent.id); } catch {}
     return runId;
   }
 
@@ -213,16 +215,25 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   stdinStream.pipe(proc.stdin!);
 
   // Capture output
+  // Lazy-load socket broadcast (avoid circular dep at module level)
+  let broadcast: typeof import('./socket-server').broadcastRunOutput | null = null;
+  try {
+    const ss = require('./socket-server');
+    broadcast = ss.broadcastRunOutput;
+  } catch {}
+
   proc.stdout?.on('data', (data: Buffer) => {
     const text = data.toString();
     stdoutLog.write(text);
     win?.webContents.send(IPC.RUN_OUTPUT, { runId, agentId: agent.id, stream: 'stdout', data: text });
+    broadcast?.(runId, 'stdout', text, agent.id);
   });
 
   proc.stderr?.on('data', (data: Buffer) => {
     const text = data.toString();
     stderrLog.write(text);
     win?.webContents.send(IPC.RUN_OUTPUT, { runId, agentId: agent.id, stream: 'stderr', data: text });
+    broadcast?.(runId, 'stderr', text, agent.id);
   });
 
   // Timeout
@@ -290,6 +301,9 @@ function finishRun(
   // Notify
   notify(agent, status, exitCode !== null ? `Exit code: ${exitCode}` : '');
   win?.webContents.send(IPC.RUN_STATUS_CHANGED, { runId, agentId: agent.id, status });
+
+  // Notify socket clients
+  try { require('./socket-server').broadcastRunDone(runId, status, agent.id); } catch {}
 }
 
 function applyLogRetention(agentId: string) {

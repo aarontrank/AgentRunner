@@ -84,6 +84,7 @@ export interface AppConfig {
     onRunTimedOut: boolean;
     onRunCancelled: boolean;
   };
+  apiToken?: string | null;
 }
 
 // IPC channel names
@@ -130,4 +131,8 @@ export const IPC = {
   // Kiro agents (read-only, scans ~/.kiro/agents/)
   KIRO_AGENTS_LIST: 'kiro-agents:list',
   KIRO_AGENT_GET: 'kiro-agent:get',
+
+  // API Token
+  API_TOKEN_GENERATE: 'api-token:generate',
+  API_TOKEN_REVOKE: 'api-token:revoke',
 } as const;

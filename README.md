@@ -15,6 +15,7 @@ Built with Electron, React, SQLite, and node-cron.
 - **Run history** — browse past runs with status, duration, exit codes, logs, and artifacts
 - **System tray** — minimizes to menu bar, sends macOS notifications on run completion/failure
 - **Hand-editable config** — `agents.json` and `config.json` are human-readable JSON files
+- **CLI remote control** — `agentrunner-cli` lets you manage agents, trigger runs, and view results from the terminal (great for SSH access)
 
 ## Screenshots
 
@@ -155,22 +156,117 @@ npm run dist
 
 The packaged app is output to `release/`.
 
+## CLI (Remote Control)
+
+AgentRunner includes a command-line tool (`agentrunner-cli`) that communicates with the running desktop app over a Unix domain socket. This is useful for managing agents over SSH without needing the GUI.
+
+### Setup
+
+**1. Build the CLI:**
+
+```bash
+npm run build:cli
+```
+
+**2. Install it globally (makes `agentrunner-cli` available anywhere):**
+
+```bash
+npm link
+```
+
+Or create a symlink manually:
+
+```bash
+ln -sf "$(pwd)/dist/cli/agentrunner-cli.js" /usr/local/bin/agentrunner-cli
+```
+
+**3. Generate an API token:**
+
+Open AgentRunner → Settings (gear icon) → **CLI Access** → click **Generate Token**.
+
+The token is automatically saved to `~/.agentrunner-token` so the CLI picks it up. You can also set the `AGENTRUNNER_TOKEN` environment variable instead.
+
+**4. Verify it works:**
+
+```bash
+agentrunner-cli status
+```
+
+> **Note:** The AgentRunner desktop app must be running for the CLI to work. The CLI is a thin client — all logic runs in the Electron app.
+
+### Commands
+
+```
+agentrunner-cli agents list                     List all agents
+agentrunner-cli agents show <id>                Show agent details
+agentrunner-cli agents create --name <n> --command <c> --workdir <d> [--cron <expr>] [--timeout <min>]
+                                                Create a new agent
+agentrunner-cli agents edit <id> [--name <n>] [--command <c>] [--workdir <d>] [--cron <expr>]
+                                                Update an agent
+agentrunner-cli agents delete <id>              Delete an agent
+agentrunner-cli agents enable <id>              Enable an agent
+agentrunner-cli agents disable <id>             Disable an agent
+
+agentrunner-cli runs list [agent-id]            List recent runs
+agentrunner-cli runs show <run-id>              Show run details
+agentrunner-cli runs logs <run-id> [--stderr]   Print run stdout (or stderr)
+agentrunner-cli runs artifacts <run-id>         List run artifacts
+
+agentrunner-cli run <agent-id>                  Start an ad-hoc run (streams output live)
+agentrunner-cli cancel <run-id>                 Cancel a running agent
+
+agentrunner-cli prompt show <agent-id>          Print current prompt
+agentrunner-cli prompt edit <agent-id>          Edit prompt in $EDITOR
+agentrunner-cli prompt history <agent-id>       List prompt versions
+
+agentrunner-cli config show                     Print app config
+agentrunner-cli config set <key> <value>        Update a config setting
+
+agentrunner-cli status                          Overview: agent counts, running agents
+agentrunner-cli help                            Show help
+```
+
+### JSON Output
+
+Add `--json` to any command for machine-readable output:
+
+```bash
+agentrunner-cli agents list --json
+agentrunner-cli runs list my-agent --json | jq '.[0].status'
+```
+
+### SSH Workflow
+
+Once the CLI is installed and a token is generated, you can manage AgentRunner remotely:
+
+```bash
+ssh my-mac
+agentrunner-cli status                          # check what's running
+agentrunner-cli run vuln-scanner                # kick off a run, watch output live
+agentrunner-cli runs logs <run-id>              # review past output
+agentrunner-cli agents create --name "nightly-tests" --command "kiro-cli chat --trust-all-tools --no-interactive" --workdir ~/projects/myapp --cron "0 2 * * *"
+```
+
 ## Project Structure
 
 ```
 src/
+├── cli/
+│   └── agentrunner-cli.ts  # CLI entry point (standalone Node.js script)
 ├── main/                   # Electron main process
 │   ├── main.ts             # App entry: window, tray, lifecycle
 │   ├── preload.ts          # Secure IPC bridge (contextBridge)
 │   ├── database.ts         # SQLite schema, migrations, CRUD
 │   ├── config.ts           # config.json / agents.json management
+│   ├── services.ts         # Shared business logic (used by IPC + socket server)
 │   ├── ipc.ts              # IPC handlers for all renderer ↔ main communication
+│   ├── socket-server.ts    # Unix domain socket server for CLI access
 │   ├── scheduler.ts        # node-cron scheduling engine
 │   └── executor.ts         # Process spawning, output capture, artifact detection
 ├── renderer/               # React UI (bundled by Vite)
 │   ├── App.tsx             # Main app shell: sidebar, detail panel, status bar
 │   ├── AgentForm.tsx       # Create/edit agent modal
-│   ├── SettingsPanel.tsx   # App settings modal
+│   ├── SettingsPanel.tsx   # App settings modal (includes API token management)
 │   ├── PromptEditor.tsx    # Full-screen prompt editor with markdown preview
 │   ├── RunDetail.tsx       # Run viewer: output tabs, artifacts, prompt used
 │   ├── styles.css          # All styles

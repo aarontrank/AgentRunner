@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
+import * as os from 'os';
 import { app } from 'electron';
 import { AppConfig, Agent } from '../shared/types';
 
@@ -49,4 +51,40 @@ export function ensureAgentDirs(agentId: string) {
 }
 
 function readJson(p: string) { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
-function writeJson(p: string, data: any) { fs.writeFileSync(p, JSON.stringify(data, null, 2)); }
+function writeJson(p: string, data: any) { fs.writeFileSync(p, JSON.stringify(data, null, 2), { mode: 0o600 }); }
+
+// --- API Token ---
+
+const TOKEN_FILE = path.join(os.homedir(), '.agentrunner-token');
+
+export function getSocketPath(): string {
+  return path.join(app.getPath('userData'), 'agentrunner.sock');
+}
+
+export function generateApiToken(): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  const cfg = getConfig();
+  cfg.apiToken = token;
+  saveConfig(cfg);
+  writeTokenFile(token);
+  return token;
+}
+
+export function revokeApiToken(): void {
+  const cfg = getConfig();
+  cfg.apiToken = null;
+  saveConfig(cfg);
+  try { fs.unlinkSync(TOKEN_FILE); } catch {}
+}
+
+export function validateApiToken(token: string): boolean {
+  const cfg = getConfig();
+  if (!cfg.apiToken) return false;
+  const a = Buffer.from(cfg.apiToken);
+  const b = Buffer.from(token);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function writeTokenFile(token: string) {
+  fs.writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
+}

@@ -77,12 +77,14 @@ app.whenReady().then(async () => {
   const { registerIpcHandlers } = require('./ipc');
   const { initScheduler } = require('./scheduler');
   const { initShellPath } = require('./executor');
+  const { startSocketServer } = require('./socket-server');
 
   await initShellPath();
   initDatabase();
   initConfig();
   registerIpcHandlers();
   initScheduler();
+  startSocketServer();
 
   mainWindow?.webContents.on('did-finish-load', () => {
     mainWindow?.webContents.send('app:ready');
@@ -97,6 +99,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   (app as any).isQuitting = true;
+  try { require('./socket-server').stopSocketServer(); } catch {}
 });
 
 app.on('window-all-closed', () => {
