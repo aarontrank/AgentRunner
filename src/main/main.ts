@@ -48,6 +48,7 @@ function createTray() {
     const menu = Menu.buildFromTemplate([
       { label: 'Open AgentRunner', click: () => mainWindow?.show() },
       { label: 'Settings', click: () => { mainWindow?.show(); mainWindow?.webContents.send('navigate', 'settings'); } },
+      { label: 'Kiro Agents', click: () => { mainWindow?.show(); mainWindow?.webContents.send('navigate', 'kiro-agents'); } },
       { type: 'separator' },
       { label: 'Quit', click: () => { (app as any).isQuitting = true; app.quit(); } },
     ]);

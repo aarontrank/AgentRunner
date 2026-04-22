@@ -17,6 +17,7 @@ import {
 } from './database';
 import { executeRun, cancelRun, getActiveProcesses } from './executor';
 import { scheduleAgent, unscheduleAgent } from './scheduler';
+import { listKiroAgents, getKiroAgent } from './kiro-agents';
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -44,6 +45,7 @@ function mapRun(r: any) {
     startedAt: r.started_at, completedAt: r.completed_at,
     exitCode: r.exit_code, promptVersion: r.prompt_version,
     promptContent: r.prompt_content, timeoutMinutes: r.timeout_minutes,
+    kiroAgent: r.kiro_agent ?? undefined,
   };
 }
 
@@ -78,6 +80,7 @@ export function registerIpcHandlers() {
       updatedAt: now,
       cliPreset: data.cliPreset,
       claudeOptions: data.claudeOptions,
+      kiroAgent: data.kiroAgent,
     };
     // Ensure unique id
     const existing = getAgentsFromFile();
@@ -229,4 +232,11 @@ export function registerIpcHandlers() {
     fs.writeFileSync(path.join(agent.workingDirectory, 'CLAUDE.md'), content);
     return true;
   });
+
+  // --- Kiro Agents (read-only, scans ~/.kiro/agents/) ---
+  const kiroAgentsDir = path.join(require('os').homedir(), '.kiro', 'agents');
+
+  ipcMain.handle(IPC.KIRO_AGENTS_LIST, () => listKiroAgents(kiroAgentsDir));
+
+  ipcMain.handle(IPC.KIRO_AGENT_GET, (_, name: string) => getKiroAgent(kiroAgentsDir, name));
 }

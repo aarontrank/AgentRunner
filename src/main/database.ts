@@ -68,6 +68,9 @@ function migrate() {
   const agentCols = (db.prepare('PRAGMA table_info(agents)').all() as any[]).map(c => c.name);
   if (!agentCols.includes('cli_preset')) db.exec('ALTER TABLE agents ADD COLUMN cli_preset TEXT');
   if (!agentCols.includes('cli_options')) db.exec('ALTER TABLE agents ADD COLUMN cli_options TEXT');
+
+  const runCols = (db.prepare('PRAGMA table_info(runs)').all() as any[]).map(c => c.name);
+  if (!runCols.includes('kiro_agent')) db.exec('ALTER TABLE runs ADD COLUMN kiro_agent TEXT');
 }
 
 // --- Agent DB ops ---
@@ -87,8 +90,8 @@ export function dbAgentDelete(id: string) { db.prepare('DELETE FROM agents WHERE
 export function dbRunsForAgent(agentId: string) { return db.prepare('SELECT * FROM runs WHERE agent_id = ? ORDER BY started_at DESC').all(agentId); }
 export function dbRunGet(runId: string) { return db.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId); }
 export function dbRunInsert(r: any) {
-  db.prepare(`INSERT INTO runs (run_id,agent_id,status,started_at,completed_at,exit_code,prompt_version,prompt_content,timeout_minutes) VALUES (?,?,?,?,?,?,?,?,?)`)
-    .run(r.run_id, r.agent_id, r.status, r.started_at, r.completed_at, r.exit_code, r.prompt_version, r.prompt_content, r.timeout_minutes);
+  db.prepare(`INSERT INTO runs (run_id,agent_id,status,started_at,completed_at,exit_code,prompt_version,prompt_content,timeout_minutes,kiro_agent) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(r.run_id, r.agent_id, r.status, r.started_at, r.completed_at, r.exit_code, r.prompt_version, r.prompt_content, r.timeout_minutes, r.kiro_agent ?? null);
 }
 export function dbRunUpdateStatus(runId: string, status: string, completedAt: string | null, exitCode: number | null) {
   db.prepare('UPDATE runs SET status=?,completed_at=?,exit_code=? WHERE run_id=?').run(status, completedAt, exitCode, runId);

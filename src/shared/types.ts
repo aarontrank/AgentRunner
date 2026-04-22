@@ -11,6 +11,20 @@ export interface ClaudeOptions {
   allowedTools?: string;                                   // comma-separated, e.g. "Bash,Read,Write"
 }
 
+// Kiro agent config (parsed from ~/.kiro/agents/*.json)
+export interface KiroAgentConfig {
+  name: string;
+  description?: string;
+  tools?: string[];
+  allowedTools?: string[];
+  mcpServers?: Record<string, { command?: string; args?: string[]; env?: Record<string, string>; url?: string }>;
+  resources?: string[];
+  prompt?: string | null;
+  model?: string;
+  filePath: string;
+  rawJson?: string;
+}
+
 // Agent definition matching agents.json schema
 export interface Agent {
   id: string;
@@ -25,9 +39,8 @@ export interface Agent {
   updatedAt: string;
   cliPreset?: CliPreset;
   claudeOptions?: ClaudeOptions;
+  kiroAgent?: string;
 }
-
-// Run states
 export type RunStatus = 'Scheduled' | 'Running' | 'Completed' | 'Failed' | 'Timed Out' | 'Cancelled';
 
 // Run record
@@ -41,9 +54,8 @@ export interface Run {
   promptVersion?: number;
   promptContent?: string;
   timeoutMinutes: number;
+  kiroAgent?: string;
 }
-
-// Artifact record
 export interface Artifact {
   id?: number;
   runId: string;
@@ -114,4 +126,8 @@ export const IPC = {
   // CLAUDE.md (read/write file in agent's workingDirectory)
   CLAUDE_MD_GET: 'claudemd:get',
   CLAUDE_MD_SAVE: 'claudemd:save',
+
+  // Kiro agents (read-only, scans ~/.kiro/agents/)
+  KIRO_AGENTS_LIST: 'kiro-agents:list',
+  KIRO_AGENT_GET: 'kiro-agent:get',
 } as const;

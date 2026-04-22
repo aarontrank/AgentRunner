@@ -4,6 +4,7 @@ import AgentForm from './AgentForm';
 import SettingsPanel from './SettingsPanel';
 import PromptEditor from './PromptEditor';
 import RunDetail from './RunDetail';
+import KiroAgentBrowser from './KiroAgentBrowser';
 
 declare global {
   interface Window {
@@ -37,6 +38,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [editAgent, setEditAgent] = useState<Agent | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showKiroAgents, setShowKiroAgents] = useState(false);
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; agentId: string } | null>(null);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
@@ -65,7 +67,11 @@ export default function App() {
   useEffect(() => {
     loadAgents();
     const unsub = api.on('app:ready', () => loadAgents());
-    return unsub;
+    const unsubNav = api.on('navigate', (target: string) => {
+      if (target === 'settings') setShowSettings(true);
+      if (target === 'kiro-agents') setShowKiroAgents(true);
+    });
+    return () => { unsub(); unsubNav(); };
   }, [loadAgents]);
 
   const loadClaudeMd = useCallback(async (agentId: string) => {
@@ -185,6 +191,7 @@ export default function App() {
       <div className="titlebar">
         <span className="titlebar-title">AgentRunner</span>
         <div className="titlebar-actions">
+          <button onClick={() => setShowKiroAgents(true)} title="Kiro Agents">🤖</button>
           <button onClick={() => setShowSettings(true)} title="Settings">⚙</button>
         </div>
       </div>
@@ -366,6 +373,7 @@ export default function App() {
       )}
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showKiroAgents && <KiroAgentBrowser onClose={() => setShowKiroAgents(false)} />}
 
       {showPromptEditor && selectedId && (
         <PromptEditor

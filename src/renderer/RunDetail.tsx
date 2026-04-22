@@ -223,6 +223,7 @@ export default function RunDetail({ run, agentId, agent, output, onDelete }: Pro
           : duration !== null && <span>Duration: {formatSeconds(duration)}</span>}
         {run.exitCode !== null && run.exitCode !== undefined && <span>Exit: {run.exitCode}</span>}
         {run.promptVersion && <span>Prompt v{run.promptVersion}</span>}
+        {run.kiroAgent && <span>Kiro Agent: {run.kiroAgent}</span>}
       </div>
 
       {/* Output tabs */}

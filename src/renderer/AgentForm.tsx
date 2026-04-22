@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { Agent, CliPreset, ClaudeOptions } from '../shared/types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Agent, CliPreset, ClaudeOptions, KiroAgentConfig } from '../shared/types';
+
+const api = typeof window !== 'undefined' && window.api ? window.api : { invoke: async () => null, on: () => () => {} };
 
 interface Props {
   agent: Agent | null;
@@ -57,6 +59,18 @@ export default function AgentForm({ agent, onSave, onClose }: Props) {
   const [claudePermMode, setClaudePermMode] = useState<'bypass' | 'allowedTools' | 'default'>(existingOpts.permissionMode || 'bypass');
   const [claudeAllowedTools, setClaudeAllowedTools] = useState(existingOpts.allowedTools || '');
 
+  // Kiro-specific options
+  const [kiroAgent, setKiroAgent] = useState(agent?.kiroAgent || '');
+  const [kiroAgents, setKiroAgents] = useState<KiroAgentConfig[]>([]);
+
+  useEffect(() => {
+    if (preset === 'kiro') {
+      api.invoke('kiro-agents:list').then((list: any) => {
+        if (Array.isArray(list)) setKiroAgents(list);
+      });
+    }
+  }, [preset]);
+
   const handlePresetChange = (p: CliPreset) => {
     setPreset(p);
     // Set a sensible default base command when switching presets
@@ -103,6 +117,7 @@ export default function AgentForm({ agent, onSave, onClose }: Props) {
       environmentVariables: Object.keys(env).length > 0 ? env : undefined,
       cliPreset: preset,
       claudeOptions: preset === 'claude' ? claudeOpts : undefined,
+      kiroAgent: preset === 'kiro' && kiroAgent ? kiroAgent : undefined,
     });
   };
 
@@ -209,6 +224,21 @@ export default function AgentForm({ agent, onSave, onClose }: Props) {
                 <div className="cmd-preview-label">Command preview</div>
                 <code className="cmd-preview-code">{commandPreview}</code>
               </div>
+            </div>
+          )}
+
+          {/* Kiro agent selector */}
+          {preset === 'kiro' && (
+            <div className="form-group">
+              <label>Kiro Agent</label>
+              <select value={kiroAgent} onChange={e => setKiroAgent(e.target.value)}>
+                <option value="">Default</option>
+                {kiroAgents.map(a => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}{a.description ? ` — ${a.description}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

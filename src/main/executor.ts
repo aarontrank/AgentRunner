@@ -80,7 +80,12 @@ export function buildCommand(agent: Agent): string {
     return parts.join(' ');
   }
 
-  // kiro, codex, custom: use executionCommand as-is
+  // kiro: append --agent if specified
+  if (preset === 'kiro' && agent.kiroAgent) {
+    return agent.executionCommand + ' --agent ' + agent.kiroAgent;
+  }
+
+  // codex, custom, kiro without agent: use executionCommand as-is
   return agent.executionCommand;
 }
 
@@ -143,7 +148,7 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   const promptContent = fs.existsSync(promptPath) ? fs.readFileSync(promptPath, 'utf-8') : '';
 
   if (!promptContent.trim()) {
-    dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: null, prompt_content: '', timeout_minutes: agent.timeoutMinutes });
+    dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: null, prompt_content: '', timeout_minutes: agent.timeoutMinutes, kiro_agent: agent.kiroAgent ?? null });
     notify(agent, 'Failed', 'Prompt file is missing or empty');
     return runId;
   }
@@ -163,7 +168,7 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
 
   // Validate working directory
   if (!fs.existsSync(agent.workingDirectory)) {
-    dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: promptVersion, prompt_content: promptContent, timeout_minutes: agent.timeoutMinutes });
+    dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Failed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(), exit_code: 1, prompt_version: promptVersion, prompt_content: promptContent, timeout_minutes: agent.timeoutMinutes, kiro_agent: agent.kiroAgent ?? null });
     notify(agent, 'Failed', `Working directory does not exist: ${agent.workingDirectory}`);
     return runId;
   }
@@ -172,7 +177,7 @@ export async function executeRun(agent: Agent, win: BrowserWindow | null): Promi
   const preRunSnapshot = snapshotDir(agent.workingDirectory);
 
   const startedAt = new Date().toISOString();
-  dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Running', started_at: startedAt, completed_at: null, exit_code: null, prompt_version: promptVersion, prompt_content: promptContent, timeout_minutes: agent.timeoutMinutes });
+  dbRunInsert({ run_id: runId, agent_id: agent.id, status: 'Running', started_at: startedAt, completed_at: null, exit_code: null, prompt_version: promptVersion, prompt_content: promptContent, timeout_minutes: agent.timeoutMinutes, kiro_agent: agent.kiroAgent ?? null });
 
   // Notify renderer
   win?.webContents.send(IPC.RUN_STATUS_CHANGED, { runId, agentId: agent.id, status: 'Running' });
